@@ -1,6 +1,6 @@
 {
   "PlcAmsNetId": "local",
-  "PlcAdsPort": 851,
+  "PlcAdsPort": 502,
   "NotificationCycleTime": 20, 
   "NotificationMaxDelay": 0, 
   "ShowFPS": true,

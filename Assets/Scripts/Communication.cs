@@ -1,335 +1,178 @@
 ﻿using UnityEngine;
 using System;
 using System.Collections.Generic;
-using System.Threading;
 using UnityEngine.SceneManagement;
-using TwinCAT.Ads;
-using TwinCAT.Ads.TypeSystem;
-using TwinCAT.TypeSystem;
-using TwinCAT;
-using TwinCAT.ValueAccess;
+using EasyModbus;
 
 public class Communication : MonoBehaviour
 {
-
-    public AppConfig appConfig;  // Parsed JSON configuration from configFile
+    private ModbusClient modbusClient;
+    public AppConfig appConfig;
     public StatusBar panelStatusBar;
-
-    private AdsClient adsClient;
-    private string configFilePath;
-    private bool isConfigFileRead = false;
     private bool isConnectedToPlc = false;
-    private bool areSymbolsMapped = false;
-    private int tagCycleTime; // On how many miliseconds should PLC check for data change.
-    private int tagMaxDelay;  // The maximum Delay time for ADS Notifications.
-
-    // A mapping from PLC tag names (values in appConfig.OutputVariableMap) to Symbol
-    private Dictionary<string, IValueSymbol> outputPlcTagToSymbol = new();
-    // A mapping from PLC tag names to read value
-    private Dictionary<string, bool> outputPlcTagToValue = new();
-    // A mapping from tag names from config file (keys in appConfig.InputVariableMap) to Symbol
-    private Dictionary<string, IValueSymbol> inputPlcTagToSymbol = new();
-
-    // Error set for storing messages about symbol mapping
-    private HashSet<string> errorSetSymbols = new();
-    // How many error messages are stored in the set. Set this to 0 to turn limit off.
-    private int errorSetSymbolsLimit = 0;
-
+    private Dictionary<string, int> outputTagToAddress = new();
+    private Dictionary<string, int> inputTagToAddress = new();
 
     void Awake()
     {
         Application.runInBackground = true;
-
-        //Debug.Log("Communication: connecting to Beckhoff PLC over ADS ...\n");
+        Debug.Log("ModbusCommunication: Connecting to Modbus PLC...");
 
         try
         {
             ConfigFileLoad();
-
-            tagCycleTime = appConfig.NotificationCycleTime;
-            tagMaxDelay = appConfig.NotificationMaxDelay;
-
             PlcConnect();
-            PlcFetchSymbols();
         }
         catch (Exception ex)
         {
-            Debug.LogError($"Communication: error during initialization: {ex.Message}");
+            Debug.LogError($"Error during initialization: {ex.Message}");
         }
     }
 
     void Start()
     {
-        InvokeRepeating(nameof(ErrorsDisplayConfig), 1f, 1f);
-        InvokeRepeating(nameof(ErrorsDisplayConnection), 1f, 1f);  //function name, init delay, repeat frequency
-        InvokeRepeating(nameof(ErrorsDisplaySymbols), 1f, 1f);
+        InvokeRepeating(nameof(CheckConnection), 1f, 5f);
     }
 
     private void PlcConnect()
     {
         try
         {
-            adsClient = new AdsClient();
-            adsClient.Connect(appConfig.PlcAmsNetId, appConfig.PlcAdsPort);
-
-            if (adsClient.IsConnected)
+            modbusClient = new ModbusClient("127.0.0.1", 502);
+            modbusClient.Connect();
+            
+            if (modbusClient.Connected)
             {
-                //Debug.Log($"PlcConnect: connected to PLC ({adsClient.Address}).");
                 isConnectedToPlc = true;
-                panelStatusBar.SetStatusBarText($"Successfully connected to PLC ({adsClient.Address}).");
+                panelStatusBar.SetStatusBarText("Connected to Modbus PLC");
+                Debug.Log("Connected to Modbus PLC");
             }
             else
             {
-                throw new Exception($"Cannot connect to PLC with address {appConfig.PlcAmsNetId}, {appConfig.PlcAdsPort}.");
+                throw new Exception("Failed to connect to Modbus PLC");
             }
         }
         catch (Exception ex)
         {
-            //Debug.LogError($"PlcConnect: {ex.Message}");
-            ErrorsAdd($"PlcConnect: {ex.Message}");
+            Debug.LogError($"PlcConnect: {ex.Message}");
             isConnectedToPlc = false;
         }
-
     }
 
-    private void PlcFetchSymbols()
+    public bool ReadCoil(string tag)
     {
-        bool symbolsFetchedOK = true;
         try
         {
-            ISymbolLoader symbolLoader = SymbolLoaderFactory.Create(adsClient, SymbolLoaderSettings.Default);
+            if (!isConnectedToPlc) return false;
 
-            // Inputs
-            foreach (string plcTag in appConfig.InputVariableMap.Values)
-            {
-                IValueSymbol symbol = null;
-                try
-                {
-                    symbol = (IValueSymbol)symbolLoader.Symbols[plcTag];
-                }
-                catch
-                {
-                    //Debug.LogError($"DBG PlcFetchSymbols: Cannot map tag '{plcTag}'; does it exists on PLC? ");
-                    ErrorsAdd(plcTag);
-                    symbolsFetchedOK = false;
-                }
-
-                inputPlcTagToSymbol[plcTag] = symbol;
-            }
-
-            // Outputs
-            foreach (string plcTag in appConfig.OutputVariableMap.Values)
-            {
-                IValueSymbol symbol = null;
-                try
-                {
-                    symbol = (IValueSymbol)symbolLoader.Symbols[plcTag];
-                    SubscribeToSymbol(symbol);
-                }
-                catch
-                {
-                    Debug.LogError($"PlcFetchSymbols: Cannot map tag '{plcTag}'; does it exists on PLC? ");
-                    ErrorsAdd(plcTag);
-                    symbolsFetchedOK = false;
-                }
-
-                outputPlcTagToSymbol[plcTag] = symbol;
-                outputPlcTagToValue[plcTag] = false;
-            }
-
-            areSymbolsMapped = symbolsFetchedOK;
+            int address = inputTagToAddress[tag];
+            bool[] coilStatus = modbusClient.ReadCoils(address, 1);
+            Debug.Log($"Read Coil {tag} ({address}): {coilStatus[0]}");
+            return coilStatus[0];
         }
-        catch
+        catch (Exception ex)
         {
-            //Debug.LogError($"PlcFetchSymbols: {ex.Message}");
-            areSymbolsMapped = false;
+            Debug.LogError($"ReadCoil Error: {ex.Message}");
+            return false;
         }
-
     }
-    private void ErrorsAdd(string message)
+
+    public int ReadRegister(string tag)
     {
-        if (errorSetSymbolsLimit == 0 || errorSetSymbols.Count < errorSetSymbolsLimit)
+        try
         {
-            errorSetSymbols.Add(message);
-        }
-    }
+            if (!isConnectedToPlc) return 0;
 
-    private void ErrorsDisplayConfig()
-    {
-        // Check for errors and show a dialog with list
-        if (!isConfigFileRead)
+            int address = inputTagToAddress[tag];
+            int[] registerValue = modbusClient.ReadHoldingRegisters(address, 1);
+            Debug.Log($"Read Register {tag} ({address}): {registerValue[0]}");
+            return registerValue[0];
+        }
+        catch (Exception ex)
         {
-            if (GameObject.FindWithTag("Dialog_error_config") == null)
-            {
-                Dialog.MessageBox(
-                    "Dialog_error_config",
-                    "Config file error",
-                    $"The config file cannot be read. Attempting to read file:\n'{configFilePath}'",
-                    "Retry", () => { Awake(); }, widthMax: 300, heightMax: 120
-                    );
-            }
+            Debug.LogError($"ReadRegister Error: {ex.Message}");
+            return 0;
         }
     }
 
-    private void ErrorsDisplayConnection()
+    public void WriteCoil(string tag, int value)
     {
-        // Check for errors and show a dialog with list
-        if (isConfigFileRead && !isConnectedToPlc)
+        try
         {
-            if (GameObject.FindWithTag("Dialog_error_PLC_connection") == null)
-            {
-                Dialog.MessageBox(
-                    "Dialog_error_PLC_connection",
-                    "Connection error",
-                    $"The connection with the Beckhoff PLC cannot be established. Address in the config file is:\n{appConfig.PlcAmsNetId}, {appConfig.PlcAdsPort}",
-                    "Retry", () => { Awake(); }, widthMax: 300, heightMax: 120
-                    );
-            }
-        }
-    }
+            if (!isConnectedToPlc) return;
 
-    private void ErrorsDisplaySymbols()
-    {
-        // Check for errors and show a dialog with list
-        if (isConfigFileRead && isConnectedToPlc && errorSetSymbols.Count != 0)
+            int address = outputTagToAddress[tag];
+            bool val = value > 0;
+            
+            modbusClient.WriteSingleCoil(address, val);
+            Debug.Log($"Wrote Coil {tag} ({address}): {val}");
+        }
+        catch (Exception ex)
         {
-            if (GameObject.FindWithTag("Dialog_error_list") == null)
-            {
-                string text = "";
-                foreach (var errorMessage in errorSetSymbols)
-                {
-                    text += "  - " + errorMessage + "\n";
-                }
-                DialogWithScroll.MessageBox(
-                    "Dialog_error_list",
-                    "Tags mapping error",
-                    text,
-                    "Retry", () => { ErrorsClear(); ConfigFileLoad(); PlcFetchSymbols(); },
-                    widthMax: 300, heightMax: 300,
-                    scrollHeight: 300,
-                    preScrollText: "There were errors when mapping IO variables. Do the following variables exist on PLC?\n"
-                    );
-            }
+            Debug.LogError($"WriteCoil Error: {ex.Message}");
         }
     }
 
-    private void ErrorsClear()
+    public void WriteRegister(string tag, int value)
     {
-        // Clear errors in a set
-        errorSetSymbols.Clear();
+        try
+        {
+            if (!isConnectedToPlc) return;
+
+            int address = outputTagToAddress[tag];
+            modbusClient.WriteSingleRegister(address, value);
+            Debug.Log($"Wrote Register {tag} ({address}): {value}");
+        }
+        catch (Exception ex)
+        {
+            Debug.LogError($"WriteRegister Error: {ex.Message}");
+        }
     }
 
-    void OnApplicationQuit()
+    private void CheckConnection()
     {
-        // Unsubscribe from all events and clean up resources
-        UnsubscribeFromAllSymbols();
-        // Disconnect and dispose
-        adsClient?.Disconnect();
-        adsClient?.Dispose();
+        if (!modbusClient.Connected)
+        {
+            Debug.LogWarning("Lost connection to Modbus PLC. Reconnecting...");
+            PlcConnect();
+        }
     }
 
-    private void SubscribeToSymbol(IValueSymbol symbol)
-    {
-        symbol.NotificationSettings = new NotificationSettings(AdsTransMode.OnChange, tagCycleTime, tagMaxDelay);
-        symbol.ValueChanged += SymbolOnValueChanged;
-    }
     private void ConfigFileLoad()
     {
         string sceneName = SceneManager.GetActiveScene().name;
         string configFile = "config-" + sceneName + ".json";
         try
         {
-            configFilePath = System.IO.Path.Combine(Application.streamingAssetsPath, configFile);
+            string configFilePath = System.IO.Path.Combine(Application.streamingAssetsPath, configFile);
             appConfig = ConfigFileManager.LoadConfig(configFilePath);
-            isConfigFileRead = true;
-        }
-        catch (Exception)
-        {
-            isConfigFileRead = false;
-            throw;
-        }
-    }
-
-    public void ConfigFileSave()
-    {
-        string sceneName = SceneManager.GetActiveScene().name;
-        string configFile = "config-" + sceneName + ".json";
-        try
-        {
-            configFilePath = System.IO.Path.Combine(Application.streamingAssetsPath, configFile);
-            ConfigFileManager.SaveConfig(configFilePath, appConfig);
-            panelStatusBar.SetStatusBarText($"Configuration saved to {configFile}.");
-        }
-        catch (Exception)
-        {
-            throw;
-        }
-    }
-
-    public async void WriteToPlc(string tag, bool valueToWrite)
-    {
-        if (isConnectedToPlc && areSymbolsMapped)
-        {
-            CancellationToken cancel = CancellationToken.None;
-            try
-            {
-                string plcTag = appConfig.InputVariableMap[tag];
-                IValueSymbol symbol = inputPlcTagToSymbol[plcTag];
-                ResultWriteAccess resultWrite = await symbol.WriteValueAsync(valueToWrite, cancel);
-                //Debug.Log($"{tag} ::: write success? {resultWrite.Succeeded}");
-            }
-            catch
-            {
-                //Debug.LogError($"WriteToPlc: error during writing tag '{tag}' to PLC: {ex.Message}");
-                ErrorsAdd($"Cannot write tag '{tag}' on PLC.");
-            }
-        }
-        else
-        {
-            //Debug.LogError($"WriteToPlc: cannot write tag {tag} to PLC, either there is no connection or mapping errors exist.");
-            //ErrorsAdd($"WriteToPlc: cannot write tag '{tag}' to PLC, either there is no connection or mapping errors exist.");
-        }
-
-    }
-
-
-
-    public void WriteToPlc(string tag, int valueToWrite)
-    {
-        // Convert int to bool: 0 is false, any other value is true
-        WriteToPlc(tag, valueToWrite != 0);
-    }
-
-    private void UnsubscribeFromAllSymbols()
-    {
-        foreach (var symbol in outputPlcTagToSymbol.Values)
-        {
-            symbol.ValueChanged -= SymbolOnValueChanged;
-        }
-    }
-
-    public bool GetTagValue(string tag)
-    {
-        try
-        {
-            string plcTag = appConfig.OutputVariableMap[tag];
-            bool value = outputPlcTagToValue[plcTag];
-            return value;
+            MapTags();
         }
         catch (Exception ex)
         {
-            //Debug.LogError($"Communication: error getting value from dictionary: {ex.Message}");
-            ErrorsAdd(ex.Message);
-            return false;
+            Debug.LogError($"ConfigFileLoad Error: {ex.Message}");
         }
     }
 
-    private void SymbolOnValueChanged(object sender, ValueChangedEventArgs e)
+    private void MapTags()
     {
-        Symbol sym = (Symbol)e.Symbol;
-        bool val = (bool)e.Value;
-        outputPlcTagToValue[sym.InstancePath] = val;
-        //Debug.Log($"ADS notification: {sym.InstancePath} value changed to {val}");
+        foreach (var entry in appConfig.InputVariableMap)
+        {
+            inputTagToAddress[entry.Key] = int.Parse(entry.Value);
+        }
+
+        foreach (var entry in appConfig.OutputVariableMap)
+        {
+            outputTagToAddress[entry.Key] = int.Parse(entry.Value);
+        }
     }
 
+    void OnApplicationQuit()
+    {
+        if (modbusClient != null && modbusClient.Connected)
+        {
+            modbusClient.Disconnect();
+            Debug.Log("Disconnected from Modbus PLC");
+        }
+    }
 }

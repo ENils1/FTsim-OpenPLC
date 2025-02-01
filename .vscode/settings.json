@@ -56,5 +56,5 @@
         "temp/": true,
         "Temp/": true
     },
-    "dotnet.defaultSolution": "FTsim-ADS.sln"
+    "dotnet.defaultSolution": "FTsim-Modbus.sln"
 }

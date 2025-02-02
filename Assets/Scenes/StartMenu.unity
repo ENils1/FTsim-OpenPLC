@@ -751,7 +751,7 @@ PrefabInstance:
     - target: {fileID: 574859758207222667, guid: 2dd2ba5483067d94e929a216253fd0ff,
         type: 3}
       propertyPath: m_AnchorMax.y
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 574859758207222667, guid: 2dd2ba5483067d94e929a216253fd0ff,
         type: 3}
@@ -761,7 +761,7 @@ PrefabInstance:
     - target: {fileID: 574859758207222667, guid: 2dd2ba5483067d94e929a216253fd0ff,
         type: 3}
       propertyPath: m_AnchorMin.y
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 574859758207222667, guid: 2dd2ba5483067d94e929a216253fd0ff,
         type: 3}
@@ -811,12 +811,12 @@ PrefabInstance:
     - target: {fileID: 574859758207222667, guid: 2dd2ba5483067d94e929a216253fd0ff,
         type: 3}
       propertyPath: m_AnchoredPosition.x
-      value: 0
+      value: 1230
       objectReference: {fileID: 0}
     - target: {fileID: 574859758207222667, guid: 2dd2ba5483067d94e929a216253fd0ff,
         type: 3}
       propertyPath: m_AnchoredPosition.y
-      value: 0
+      value: -280.30734
       objectReference: {fileID: 0}
     - target: {fileID: 574859758207222667, guid: 2dd2ba5483067d94e929a216253fd0ff,
         type: 3}
@@ -837,6 +837,11 @@ PrefabInstance:
         type: 3}
       propertyPath: m_Name
       value: ButtonPS
+      objectReference: {fileID: 0}
+    - target: {fileID: 6179718709873056027, guid: 2dd2ba5483067d94e929a216253fd0ff,
+        type: 3}
+      propertyPath: m_IsActive
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 6484047525803643963, guid: 2dd2ba5483067d94e929a216253fd0ff,
         type: 3}
@@ -1302,7 +1307,7 @@ PrefabInstance:
     - target: {fileID: 574859758207222667, guid: 2dd2ba5483067d94e929a216253fd0ff,
         type: 3}
       propertyPath: m_AnchorMax.y
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 574859758207222667, guid: 2dd2ba5483067d94e929a216253fd0ff,
         type: 3}
@@ -1312,7 +1317,7 @@ PrefabInstance:
     - target: {fileID: 574859758207222667, guid: 2dd2ba5483067d94e929a216253fd0ff,
         type: 3}
       propertyPath: m_AnchorMin.y
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 574859758207222667, guid: 2dd2ba5483067d94e929a216253fd0ff,
         type: 3}
@@ -1362,12 +1367,12 @@ PrefabInstance:
     - target: {fileID: 574859758207222667, guid: 2dd2ba5483067d94e929a216253fd0ff,
         type: 3}
       propertyPath: m_AnchoredPosition.x
-      value: 0
+      value: 960
       objectReference: {fileID: 0}
     - target: {fileID: 574859758207222667, guid: 2dd2ba5483067d94e929a216253fd0ff,
         type: 3}
       propertyPath: m_AnchoredPosition.y
-      value: 0
+      value: -280.30734
       objectReference: {fileID: 0}
     - target: {fileID: 574859758207222667, guid: 2dd2ba5483067d94e929a216253fd0ff,
         type: 3}
@@ -1389,6 +1394,11 @@ PrefabInstance:
       propertyPath: m_CullTransparentMesh
       value: 1
       objectReference: {fileID: 0}
+    - target: {fileID: 4625653327730171757, guid: 2dd2ba5483067d94e929a216253fd0ff,
+        type: 3}
+      propertyPath: m_CullTransparentMesh
+      value: 1
+      objectReference: {fileID: 0}
     - target: {fileID: 5234658670599420759, guid: 2dd2ba5483067d94e929a216253fd0ff,
         type: 3}
       propertyPath: m_Maskable
@@ -1398,6 +1408,11 @@ PrefabInstance:
         type: 3}
       propertyPath: m_Name
       value: ButtonRR
+      objectReference: {fileID: 0}
+    - target: {fileID: 6179718709873056027, guid: 2dd2ba5483067d94e929a216253fd0ff,
+        type: 3}
+      propertyPath: m_IsActive
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 6484047525803643963, guid: 2dd2ba5483067d94e929a216253fd0ff,
         type: 3}

@@ -89,7 +89,7 @@ public class Piston : MonoBehaviour
         if (airPressureController.GetAirPressureLevel() > 0)
         {
             if (pistonType == PistonLocation.Machine) {
-                if (com.GetTagValue(tagValveMachine)){
+                if (com.ReadCoil(tagValveMachine)){
                     MoveForward();
                     //UnityEngine.Debug.Log($"moving {pistonType} piston forward");
                 } else {
@@ -97,12 +97,12 @@ public class Piston : MonoBehaviour
                     //UnityEngine.Debug.Log($"moving {pistonType} piston backward");
                 }
             }
-            else if (com.GetTagValue(tagForward))
+            else if (com.ReadCoil(tagForward))
             {
                 MoveForward();
                 //UnityEngine.Debug.Log($"moving {pistonType} piston forward");
             }
-            else if (com.GetTagValue(tagBackward))
+            else if (com.ReadCoil(tagBackward))
             {
                 MoveBackward();
                 //UnityEngine.Debug.Log($"moving {pistonType} piston backward");

@@ -2,26 +2,44 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine.SceneManagement;
-using EasyModbus;
+using System.Net.Sockets;
+using System.Text;
+using System.Threading;
+using Newtonsoft.Json;
+using UnityEditor.VersionControl;
+
 
 public class Communication : MonoBehaviour
 {
-    private ModbusClient modbusClient;
+    private string configFilePath;
     public AppConfig appConfig;
     public StatusBar panelStatusBar;
-    private bool isConnectedToPlc = false;
-    private Dictionary<string, int> outputTagToAddress = new();
-    private Dictionary<string, int> inputTagToAddress = new();
+
+    // Mapper for input- og output-tags
+    private Dictionary<string, string> outputTagToAddress = new();
+    private Dictionary<string, string> inputTagToAddress = new();
+
+    private TcpClient client;
+    private NetworkStream stream;
+    private Thread receiveThread;
+    // Brukes for å lagre mottatte coil-verdier
+    private Dictionary<string, bool> coilValues = new();
+    // Lås for trådsikker tilgang til coilValues
+    private readonly object coilValuesLock = new();
+
+    // Event for mottatte meldinger
+    public event Action<string> MessageReceived;
+
+    public bool IsConnected => client != null && client.Connected;
 
     void Awake()
     {
         Application.runInBackground = true;
-        Debug.Log("ModbusCommunication: Connecting to Modbus PLC...");
-
+        Debug.Log("Communication: Connecting to OpenPLC...");
         try
         {
             ConfigFileLoad();
-            PlcConnect();
+            TCPConnect();
         }
         catch (Exception ex)
         {
@@ -32,109 +50,160 @@ public class Communication : MonoBehaviour
     void Start()
     {
         InvokeRepeating(nameof(CheckConnection), 1f, 5f);
+        MessageReceived += OnMessageReceived;
+    }
+    
+    
+    public void TCPConnect()
+    {   
+        try
+        {
+            client = new TcpClient();
+            client.Connect("127.0.0.1", 5000);
+            stream = client.GetStream();
+            
+            // Start mottaketråden
+            receiveThread = new Thread(ReceiveLoop);
+            receiveThread.IsBackground = true;
+            receiveThread.Start();
+            
+            Debug.Log("TCP CONNECTED...");
+            panelStatusBar.SetStatusBarText("Connected to OpenPLC");
+        }
+        catch (Exception ex)
+        {
+            Debug.LogError("Error connecting: " + ex.Message);
+        }
     }
 
-    private void PlcConnect()
+    private void ReceiveLoop()
     {
         try
         {
-            modbusClient = new ModbusClient("127.0.0.1", 502);
-            modbusClient.Connect();
-            
-            if (modbusClient.Connected)
+            byte[] buffer = new byte[1024];
+            while (true)
             {
-                isConnectedToPlc = true;
-                panelStatusBar.SetStatusBarText("Connected to Modbus PLC");
-                Debug.Log("Connected to Modbus PLC");
-            }
-            else
-            {
-                throw new Exception("Failed to connect to Modbus PLC");
+                // Blokkerende kall: leser data fra stream
+                int bytesRead = stream.Read(buffer, 0, buffer.Length);
+                if (bytesRead == 0)
+                {
+                    // Forbindelsen ble avsluttet fra serverens side
+                    break;
+                }
+                // Konverter mottatte bytes til tekst (for eksempel JSON)
+                string message = Encoding.UTF8.GetString(buffer, 0, bytesRead);
+                // Utløser eventen dersom noen har abonnert på den
+                MessageReceived?.Invoke(message);
             }
         }
         catch (Exception ex)
         {
-            Debug.LogError($"PlcConnect: {ex.Message}");
-            isConnectedToPlc = false;
+            Console.WriteLine("Error receiving data: " + ex.Message);
+            
+        }
+        finally
+        {
+            Disconnect();
         }
     }
 
+    public void SendMessage(string message)
+    {
+        if (IsConnected)
+        {
+            byte[] data = Encoding.UTF8.GetBytes(message);
+            try
+            {
+                stream.Write(data, 0, data.Length);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("Error sending message: " + ex.Message);
+            }
+        }
+        else
+        {
+            Console.WriteLine("Cannot send message. Not connected.");
+        }
+    }
+    
+    public void Disconnect()
+    {
+        try
+        {
+            stream?.Close();
+            client?.Close();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine("Error during disconnect: " + ex.Message);
+        }
+        Console.WriteLine("Disconnected from server.");
+    }
+    
+    
+    public void WriteDiscreteInput(string tag, int value)
+    {   
+        string address = inputTagToAddress[tag];
+        var command = new
+        {
+            action = "set_IX",
+            address,
+            value
+        };
+        string jsonCommand = JsonConvert.SerializeObject(command);
+        SendMessage(jsonCommand);
+        Debug.Log("Sent command: " + jsonCommand);
+    }
+    
+    private void OnMessageReceived(string message)
+    {
+        Debug.Log("Received: " + message);
+        try
+        {
+            // Deserialiser JSON-strengen til en dictionary
+            var data = JsonConvert.DeserializeObject<Dictionary<string, bool>>(message);
+            if (data != null)
+            {
+                foreach (var entry in data)
+                {
+                    // Oppdaterer coilValues med hver key/value-par
+                    coilValues[entry.Key] = entry.Value;
+                    Debug.Log($"Output update: {entry.Key} = {entry.Value}");
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.LogError("Error parsing JSON: " + ex.Message);
+        }
+    }
+    
     public bool ReadCoil(string tag)
     {
-        try
+        lock (coilValuesLock)
         {
-            if (!isConnectedToPlc) return false;
-
-            int address = inputTagToAddress[tag];
-            bool[] coilStatus = modbusClient.ReadCoils(address, 1);
-            Debug.Log($"Read Coil {tag} ({address}): {coilStatus[0]}");
-            return coilStatus[0];
+            string address = outputTagToAddress[tag];
+            if (coilValues.ContainsKey(address))
+            {
+                bool value = coilValues[address];
+                Debug.Log($"Coil {address} value: {value}");
+                return value;
+            } 
         }
-        catch (Exception ex)
-        {
-            Debug.LogError($"ReadCoil Error: {ex.Message}");
-            return false;
-        }
+        
+        Debug.LogWarning($"Coil {tag} not found (ingen oppdatering mottatt ennå).");
+        return false;
     }
 
-    public int ReadRegister(string tag)
-    {
-        try
-        {
-            if (!isConnectedToPlc) return 0;
-
-            int address = inputTagToAddress[tag];
-            int[] registerValue = modbusClient.ReadHoldingRegisters(address, 1);
-            Debug.Log($"Read Register {tag} ({address}): {registerValue[0]}");
-            return registerValue[0];
-        }
-        catch (Exception ex)
-        {
-            Debug.LogError($"ReadRegister Error: {ex.Message}");
-            return 0;
-        }
-    }
-
-    public void WriteCoil(string tag, int value)
-    {
-        try
-        {
-            if (!isConnectedToPlc) return;
-
-            int address = outputTagToAddress[tag];
-            bool val = value > 0;
-            
-            modbusClient.WriteSingleCoil(address, val);
-            Debug.Log($"Wrote Coil {tag} ({address}): {val}");
-        }
-        catch (Exception ex)
-        {
-            Debug.LogError($"WriteCoil Error: {ex.Message}");
-        }
-    }
-
-    public void WriteRegister(string tag, int value)
-    {
-        try
-        {
-            if (!isConnectedToPlc) return;
-
-            int address = outputTagToAddress[tag];
-            modbusClient.WriteSingleRegister(address, value);
-            Debug.Log($"Wrote Register {tag} ({address}): {value}");
-        }
-        catch (Exception ex)
-        {
-            Debug.LogError($"WriteRegister Error: {ex.Message}");
-        }
-    }
+    
 
     private void CheckConnection()
     {
-        if (!modbusClient.Connected)
+        if (client == null || !client.Connected)
         {
-            Debug.LogWarning("Lost connection to Modbus PLC. Reconnecting...");
-            PlcConnect();
+            Debug.LogWarning("Lost connection to OpenPLC. Reconnecting...");
+            TCPConnect();
         }
     }
 
@@ -144,13 +213,31 @@ public class Communication : MonoBehaviour
         string configFile = "config-" + sceneName + ".json";
         try
         {
-            string configFilePath = System.IO.Path.Combine(Application.streamingAssetsPath, configFile);
+            configFilePath = System.IO.Path.Combine(Application.streamingAssetsPath, configFile);
             appConfig = ConfigFileManager.LoadConfig(configFilePath);
             MapTags();
+            Debug.Log($"Config file loaded: {configFilePath}");
         }
         catch (Exception ex)
         {
             Debug.LogError($"ConfigFileLoad Error: {ex.Message}");
+        }
+    }
+    
+    public void ConfigFileSave()
+    {
+        string sceneName = SceneManager.GetActiveScene().name;
+        string configFile = "config-" + sceneName + ".json";
+        try
+        {
+            configFilePath = System.IO.Path.Combine(Application.streamingAssetsPath, configFile);
+            ConfigFileManager.SaveConfig(configFilePath, appConfig);
+            panelStatusBar.SetStatusBarText($"Configuration saved to {configFile}.");
+        }
+        catch (Exception ex)
+        {
+            Debug.LogError("Error saving configuration: " + ex.Message);
+            throw;
         }
     }
 
@@ -158,20 +245,20 @@ public class Communication : MonoBehaviour
     {
         foreach (var entry in appConfig.InputVariableMap)
         {
-            inputTagToAddress[entry.Key] = int.Parse(entry.Value);
+            inputTagToAddress[entry.Key] = entry.Value;
         }
 
         foreach (var entry in appConfig.OutputVariableMap)
         {
-            outputTagToAddress[entry.Key] = int.Parse(entry.Value);
+            outputTagToAddress[entry.Key] = entry.Value;
         }
     }
 
     void OnApplicationQuit()
     {
-        if (modbusClient != null && modbusClient.Connected)
+        if (client != null && client.Connected)
         {
-            modbusClient.Disconnect();
+            Disconnect();
             Debug.Log("Disconnected from Modbus PLC");
         }
     }

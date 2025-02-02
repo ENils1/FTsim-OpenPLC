@@ -1,49 +1,56 @@
 {
   "PlcAmsNetId": "local",
   "PlcAdsPort": 502,
-  "NotificationCycleTime": 20, 
-  "NotificationMaxDelay": 0, 
+  "NotificationCycleTime": 20,
+  "NotificationMaxDelay": 0,
   "ShowFPS": true,
   "InputVariableMap": {
-    "ToggleSwitch": "IO.ToggleSwitch",
-    "ButtonRed": "IO.ButtonRed",
-    "ButtonGreen": "IO.ButtonGreen",
-    "ButtonBlackTopLeft": "IO.ButtonBlackLeftUp",
-    "ButtonBlackTopRight": "IO.ButtonBlackRightUp",
-    "ButtonBlackBottomLeft": "IO.ButtonBlackLeftDown",
-    "ButtonBlackBottomRight": "IO.ButtonBlackRightDown",
-    "PhotocellEntry": "IO.PhotocellEntry",
-    "PhotocellBelt1": "IO.PhotocellBelt1",
-    "PhotocellBelt2": "IO.PhotocellBelt2",
-    "PhotocellBelt3": "IO.PhotocellBelt3",
-    "PhotocellExit": "IO.PhotocellBelt4",
-    "SwitchPusher1Start": "IO.Pusher1Start",
-    "SwitchPusher1End": "IO.Pusher1End",
-    "SwitchPusher2Start": "IO.Pusher2Start",
-    "SwitchPusher2End": "IO.Pusher2End"
+    "PhotocellEntry": "IX1.0",
+    "PhotocellBelt1": "IX0.6",
+    "PhotocellBelt2": "IX0.7",
+    "PhotocellBelt3": "IX1.1",
+    "PhotocellExit": "IX1.2",
+
+    "SwitchPusher1Start": "IX0.3",
+    "SwitchPusher1End": "IX0.2",
+    "SwitchPusher2Start": "IX0.5",
+    "SwitchPusher2End": "IX0.4",
+    
+    "ToggleSwitch": "IX3.0",
+    "ButtonRed": "IX3.1",
+    "ButtonGreen": "IX3.2",
+    "ButtonBlackTopLeft": "IX3.3",
+    "ButtonBlackTopRight": "IX3.4",
+    "ButtonBlackBottomLeft": "IX3.5",
+    "ButtonBlackBottomRight": "IX3.6"
+    
+    
   },
   "OutputVariableMap": {
-    "LightRed": "IO.LEDRed",
-    "LightGreen": "IO.LEDGreen",
-    "LightBlueTop": "IO.LEDBlueUp",
-    "LightBlueBottom": "IO.LEDBlueDown",
-    "Belt1Direction": "IO.Belt1Direction",
-    "Belt1Movement": "IO.Belt1Movement",
-    "Belt2Direction": "IO.Belt2Direction",
-    "Belt2Movement": "IO.Belt2Movement",
-    "Belt3Direction": "IO.Belt3Direction",
-    "Belt3Movement": "IO.Belt3Movement",
-    "Belt4Direction": "IO.Belt4Direction",
-    "Belt4Movement": "IO.Belt4Movement",
-    "Machine1Direction": "IO.Machine1Direction",
-    "Machine1Movement": "IO.Machine1Movement",
-    "Machine2Direction": "IO.Machine2Direction",
-    "Machine2Movement": "IO.Machine2Movement",
-    "Pusher1Direction": "IO.Pusher1Direction",
-    "Pusher1Movement": "IO.Pusher1Movement",
-    "Pusher2Direction": "IO.Pusher2Direction",
-    "Pusher2Movement": "IO.Pusher2Movement"
+    "Pusher1Direction": "QX0.0",
+    "Pusher1Movement": "QX0.1",
+    "Pusher2Direction": "QX0.2",
+    "Pusher2Movement": "QX0.3",
+
+    "Belt1Movement": "QX0.4",
+    "Belt2Movement": "QX0.5",
+    "Belt3Movement": "QX0.7",
+    "Belt4Movement": "QX1.1",
+
+    "Machine1Movement": "QX0.6",
+    "Machine2Movement": "QX1.0",
+    
+    "Belt1Direction": "QX3.0",
+    "Belt2Direction": "QX3.1",
+    "Belt3Direction": "QX3.2",
+    "Belt4Direction": "QX3.3",
+    "Machine1Direction": "QX3.4",
+    "Machine2Direction": "QX3.5",
+    
+    "LightRed": "QX2.0",
+    "LightGreen": "QX2.1",
+    "LightBlueTop": "QX2.2",
+    "LightBlueBottom": "QX2.3"
   },
   "TrainingModelSpecific": {}
-
 }

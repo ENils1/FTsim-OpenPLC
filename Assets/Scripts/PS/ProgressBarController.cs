@@ -39,7 +39,7 @@ public class ProgressBarController : MonoBehaviour
         while (isRunning) // Keep running the coroutine
         {
             //Debug.Log($"isrunning");
-            if (com.GetTagValue(MotorCompressor))
+            if (com.ReadCoil(MotorCompressor))
             {
                 
                 // If there are missing squares, add one

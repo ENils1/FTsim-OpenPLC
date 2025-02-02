@@ -136,9 +136,9 @@ public class Pusher : MonoBehaviour
         }
 
         // Movement control
-        if (com.GetTagValue(tagMovement))
+        if (com.ReadCoil(tagMovement))
         {
-            if (com.GetTagValue(tagDirection) ^ reversePolarity)
+            if (com.ReadCoil(tagDirection) ^ reversePolarity)
             {
                 MoveBackward();
             }
@@ -156,7 +156,7 @@ public class Pusher : MonoBehaviour
             //  If both forces are inactive, write to PLC
             if (!(forceFalse || forceTrue))
             {
-                com.WriteCoil(tag, newValue);
+                com.WriteDiscreteInput(tag, newValue);
             }
         }
     }
@@ -172,7 +172,7 @@ public class Pusher : MonoBehaviour
         {
             val = switchStartValue;
         }
-        com.WriteCoil(tagSwitchStart, val);
+        com.WriteDiscreteInput(tagSwitchStart, val);
 
     }
     public void SwitchStartForceFalseOnChange(Toggle change)
@@ -187,7 +187,7 @@ public class Pusher : MonoBehaviour
         {
             val = switchStartValue;
         }
-        com.WriteCoil(tagSwitchStart, val);
+        com.WriteDiscreteInput(tagSwitchStart, val);
     }
     public void SwitchEndForceTrueOnChange(Toggle change)
     {
@@ -201,7 +201,7 @@ public class Pusher : MonoBehaviour
         {
             val = switchEndValue;
         }
-        com.WriteCoil(tagSwitchEnd, val);
+        com.WriteDiscreteInput(tagSwitchEnd, val);
 
     }
     public void SwitchEndForceFalseOnChange(Toggle change)
@@ -216,6 +216,6 @@ public class Pusher : MonoBehaviour
         {
             val = switchEndValue;
         }
-        com.WriteCoil(tagSwitchEnd, val);
+        com.WriteDiscreteInput(tagSwitchEnd, val);
     }
 }

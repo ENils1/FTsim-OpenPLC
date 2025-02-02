@@ -149,9 +149,9 @@ public class ArmLift : MonoBehaviour
         // Movement control
         if (allowedToMove)
         {
-            if (communication.GetTagValue(tagMovement))
+            if (communication.ReadCoil(tagMovement))
             {
-                if (communication.GetTagValue(tagDirection))
+                if (communication.ReadCoil(tagDirection))
                 {
                     MoveTowardSwitch();
                 }
@@ -268,7 +268,7 @@ public class ArmLift : MonoBehaviour
             //  If both forces are inactive, write to PLC
             if (!(forceFalse || forceTrue))
             {
-                communication.WriteToPlc(tag, newValue);
+                communication.WriteDiscreteInput(tag, newValue);
             }
         }
     }
@@ -282,7 +282,7 @@ public class ArmLift : MonoBehaviour
         {
             val = switchReferenceValue;
         }
-        communication.WriteToPlc(tagSwitchReference, val);
+        communication.WriteDiscreteInput(tagSwitchReference, val);
     }
 
     public void SwitchReferenceForceFalseOnChange(Toggle change)
@@ -295,7 +295,7 @@ public class ArmLift : MonoBehaviour
         {
             val = switchReferenceValue;
         }
-        communication.WriteToPlc(tagSwitchReference, val);
+        communication.WriteDiscreteInput(tagSwitchReference, val);
     }
 
     public void SwitchStepForceTrueOnChange(Toggle change)
@@ -308,7 +308,7 @@ public class ArmLift : MonoBehaviour
         {
             val = switchStepValue;
         }
-        communication.WriteToPlc(tagSwitchStep, val);
+        communication.WriteDiscreteInput(tagSwitchStep, val);
     }
 
     public void SwitchStepForceFalseOnChange(Toggle change)
@@ -321,7 +321,7 @@ public class ArmLift : MonoBehaviour
         {
             val = switchStepValue;
         }
-        communication.WriteToPlc(tagSwitchStep, val);
+        communication.WriteDiscreteInput(tagSwitchStep, val);
     }
 
 }

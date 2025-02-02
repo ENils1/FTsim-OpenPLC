@@ -15,13 +15,13 @@ public class leverRotate : MonoBehaviour
     void Start()
     {
         com = GameObject.Find("Communication").GetComponent<Communication>();
-        com.WriteToPlc(SwitchCompressorTag, false);
+        com.WriteDiscreteInput(SwitchCompressorTag, 0);
     }
 
     public void SwitchCompressorChange(Toggle change)
     {
         //Debug.Log("SwitchCompressorChange: " + change.isOn);
-        com.WriteToPlc(SwitchCompressorTag, change.isOn);
+        com.WriteDiscreteInput(SwitchCompressorTag, change.isOn ? 1 : 0);
         if (change && !isAnimating)
         {
             StartCoroutine(RotateLever(change.isOn));
@@ -67,7 +67,7 @@ public class leverRotate : MonoBehaviour
         {
             val = sensorValue;
         }
-        com.WriteToPlc(SwitchCompressorTag, val);
+        com.WriteDiscreteInput(SwitchCompressorTag, val);
 
     }
     public void SwitchForceFalseOnChange(Toggle change)
@@ -82,6 +82,6 @@ public class leverRotate : MonoBehaviour
         {
             val = sensorValue;
         }
-        com.WriteToPlc(SwitchCompressorTag, val);
+        com.WriteDiscreteInput(SwitchCompressorTag, val);
     }
 }

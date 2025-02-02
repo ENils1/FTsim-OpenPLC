@@ -51,7 +51,7 @@ public class AirPressureController : MonoBehaviour
     {
         while (true)
         {
-            if (com.GetTagValue(MotorCompressor))
+            if (com.ReadCoil(MotorCompressor))
             {
                 IncrementAirPressureLevel();
             }

@@ -24,9 +24,9 @@ public class RotateAxis : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
-        if (com.GetTagValue(tagMovement))
+        if (com.ReadCoil(tagMovement))
         {
-            if (com.GetTagValue(tagDirection))
+            if (com.ReadCoil(tagDirection))
             {
                 transform.Rotate(new Vector3(0, 0, Time.deltaTime * motorAxisSpeed));
             }

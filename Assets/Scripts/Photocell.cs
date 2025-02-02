@@ -51,6 +51,7 @@ public class Photocell : MonoBehaviour
         forceFalse = false;
         boundsDetectorA = detectorA.GetComponent<Renderer>().bounds;
         boundsDetectorB = detectorB.GetComponent<Renderer>().bounds;
+        
 
     }
 
@@ -82,7 +83,7 @@ public class Photocell : MonoBehaviour
             //  If both forces are inactive, write to PLC
             if (!(forceFalse || forceTrue))
             {
-                com.WriteToPlc(tag, newValue);
+                com.WriteDiscreteInput(tag, newValue);
             }
             sensorValue = newValue;
         }
@@ -100,7 +101,7 @@ public class Photocell : MonoBehaviour
         {
             val = sensorValue;
         }
-        com.WriteToPlc(sensorTag, val);
+        com.WriteDiscreteInput(sensorTag, val);
 
     }
     public void ForceFalseOnChange(Toggle change)
@@ -115,7 +116,7 @@ public class Photocell : MonoBehaviour
         {
             val = sensorValue;
         }
-        com.WriteToPlc(sensorTag, val);
+        com.WriteDiscreteInput(sensorTag, val);
     }
 
 }

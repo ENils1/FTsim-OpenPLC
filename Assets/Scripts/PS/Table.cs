@@ -48,10 +48,10 @@ public class Table : MonoBehaviour
         //if (timer > waitTime)
         //{
             //--
-            if (com.GetTagValue(tagTableMovement))
+            if (com.ReadCoil(tagTableMovement))
             {
                 //Debug.Log($"Table moventent");
-                if (com.GetTagValue(tagTableDirection))
+                if (com.ReadCoil(tagTableDirection))
                 {
                     //Debug.Log("rotate CCW");
                     rotate_CCW();

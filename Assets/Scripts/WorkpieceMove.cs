@@ -29,17 +29,17 @@ public class WorkpieceMove : MonoBehaviour
     void FixedUpdate()
     {
         workpieces = GameObject.FindGameObjectsWithTag("Workpiece");
-
+        //Debug.Log("Workpiece move.");
         foreach (GameObject workpiece in workpieces)
         {
             bndWorkpiece = workpiece.GetComponent<Renderer>().bounds;
 
             if (bndWorkpiece.Intersects(bndForceField))
             {
-                if (com.GetTagValue(tagMovement))
+                if (com.ReadCoil(tagMovement))
                 {
                     Vector3 movement = Time.fixedDeltaTime * speed * direction;
-                    if (com.GetTagValue(tagDirection))
+                    if (com.ReadCoil(tagDirection))
                     {
                         movement = -movement;
                     }

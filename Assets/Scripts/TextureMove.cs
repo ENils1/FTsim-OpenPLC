@@ -31,9 +31,9 @@ public class textureMove : MonoBehaviour {
 	// Update is called once per frame
 	void FixedUpdate () {		
 
-		if (com.GetTagValue(tagMovement))
+		if (com.ReadCoil(tagMovement))
 		{	
-			if (!com.GetTagValue(tagDirection))
+			if (!com.ReadCoil(tagDirection))
 			{
 				dir = -1;
 			}

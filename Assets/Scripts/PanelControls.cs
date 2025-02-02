@@ -17,13 +17,13 @@ public class PanelControls : MonoBehaviour
     {
         
         // Initialize all panel inputs to false (buttons, toggle switch)
-        communication.WriteToPlc("ToggleSwitch", false);
-        communication.WriteToPlc("ButtonRed", false);
-        communication.WriteToPlc("ButtonGreen", false);
-        communication.WriteToPlc("ButtonBlackTopLeft", false);
-        communication.WriteToPlc("ButtonBlackTopRight", false);
-        communication.WriteToPlc("ButtonBlackBottomLeft", false);
-        communication.WriteToPlc("ButtonBlackBottomRight", false);
+        communication.WriteDiscreteInput("ToggleSwitch", 0);
+        communication.WriteDiscreteInput("ButtonRed", 0);
+        communication.WriteDiscreteInput("ButtonGreen", 0);
+        communication.WriteDiscreteInput("ButtonBlackTopLeft", 0);
+        communication.WriteDiscreteInput("ButtonBlackTopRight", 0);
+        communication.WriteDiscreteInput("ButtonBlackBottomLeft", 0);
+        communication.WriteDiscreteInput("ButtonBlackBottomRight", 0);
 
         workpiece.SetActive(false);
     }
@@ -31,10 +31,10 @@ public class PanelControls : MonoBehaviour
     void Update()
     {
         // Control lights
-        lightRed.GetComponent<Toggle>().isOn = communication.GetTagValue("LightRed");
-        lightGreen.GetComponent<Toggle>().isOn = communication.GetTagValue("LightGreen");
-        lightBlueTop.GetComponent<Toggle>().isOn = communication.GetTagValue("LightBlueTop");
-        lightBlueBottom.GetComponent<Toggle>().isOn = communication.GetTagValue("LightBlueBottom");
+        lightRed.GetComponent<Toggle>().isOn = communication.ReadCoil("LightRed");
+        lightGreen.GetComponent<Toggle>().isOn = communication.ReadCoil("LightGreen");
+        lightBlueTop.GetComponent<Toggle>().isOn = communication.ReadCoil("LightBlueTop");
+        lightBlueBottom.GetComponent<Toggle>().isOn = communication.ReadCoil("LightBlueBottom");
     }
 
     public void CreateNewWorkpiece()
@@ -66,30 +66,30 @@ public class PanelControls : MonoBehaviour
 
     public void ToggleSwitchOnChange(Toggle change)
     {
-        communication.WriteToPlc("ToggleSwitch", change.isOn);
+        communication.WriteDiscreteInput("ToggleSwitch", change.isOn ? 1:0);
     }
     public void ButtonRedOnChange(Toggle change)
     {
-        communication.WriteToPlc("ButtonRed", change.isOn);
+        communication.WriteDiscreteInput("ButtonRed", change.isOn ? 1:0);
     }
     public void ButtonGreenOnChange(Toggle change)
     {
-        communication.WriteToPlc("ButtonGreen", change.isOn);
+        communication.WriteDiscreteInput("ButtonGreen", change.isOn ? 1:0);
     }
     public void ButtonBlackTopLeftOnChange(Toggle change)
     {
-        communication.WriteToPlc("ButtonBlackTopLeft", change.isOn);
+        communication.WriteDiscreteInput("ButtonBlackTopLeft", change.isOn ? 1:0);
     }
     public void ButtonBlackTopRightOnChange(Toggle change)
     {
-        communication.WriteToPlc("ButtonBlackTopRight", change.isOn);
+        communication.WriteDiscreteInput("ButtonBlackTopRight", change.isOn ? 1:0);
     }
     public void ButtonBlackBottomLeftOnChange(Toggle change)
     {
-        communication.WriteToPlc("ButtonBlackBottomLeft", change.isOn);
+        communication.WriteDiscreteInput("ButtonBlackBottomLeft", change.isOn ? 1:0);
     }
     public void ButtonBlackBottomRightOnChange(Toggle change)
     {
-        communication.WriteToPlc("ButtonBlackBottomRight", change.isOn);
+        communication.WriteDiscreteInput("ButtonBlackBottomRight", change.isOn ? 1:0);
     }
 }

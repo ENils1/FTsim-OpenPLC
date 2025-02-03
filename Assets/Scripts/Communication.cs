@@ -75,7 +75,7 @@ public class Communication : MonoBehaviour
             Debug.LogError("Error connecting: " + ex.Message);
         }
     }
-
+    
     private void ReceiveLoop()
     {
         try
@@ -153,12 +153,12 @@ public class Communication : MonoBehaviour
         };
         string jsonCommand = JsonConvert.SerializeObject(command);
         SendMessage(jsonCommand);
-        Debug.Log("Sent command: " + jsonCommand);
+        //Debug.Log("Sent command: " + jsonCommand);
     }
     
     private void OnMessageReceived(string message)
     {
-        Debug.Log("Received: " + message);
+        //Debug.Log("Received: " + message);
         try
         {
             // Deserialiser JSON-strengen til en dictionary
@@ -169,7 +169,7 @@ public class Communication : MonoBehaviour
                 {
                     // Oppdaterer coilValues med hver key/value-par
                     coilValues[entry.Key] = entry.Value;
-                    Debug.Log($"Output update: {entry.Key} = {entry.Value}");
+                    //Debug.Log($"Output update: {entry.Key} = {entry.Value}");
                 }
             }
         }
@@ -187,12 +187,12 @@ public class Communication : MonoBehaviour
             if (coilValues.ContainsKey(address))
             {
                 bool value = coilValues[address];
-                Debug.Log($"Coil {address} value: {value}");
+                //Debug.Log($"Coil {address} value: {value}");
                 return value;
             } 
         }
         
-        Debug.LogWarning($"Coil {tag} not found (ingen oppdatering mottatt ennå).");
+        //Debug.LogWarning($"Coil {tag} not found (ingen oppdatering mottatt ennå).");
         return false;
     }
 

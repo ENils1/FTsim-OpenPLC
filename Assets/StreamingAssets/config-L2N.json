@@ -27,10 +27,10 @@
     
   },
   "OutputVariableMap": {
-    "Pusher1Direction": "QX0.0",
-    "Pusher1Movement": "QX0.1",
-    "Pusher2Direction": "QX0.2",
-    "Pusher2Movement": "QX0.3",
+    "Pusher1Forward": "QX0.0",
+    "Pusher1Backward": "QX0.1",
+    "Pusher2Forward": "QX0.2",
+    "Pusher2Backward": "QX0.3",
 
     "Belt1Movement": "QX0.4",
     "Belt2Movement": "QX0.5",

@@ -9,15 +9,17 @@ public enum PositionAxis
 }
 
 public class Pusher : MonoBehaviour
-{
+{   
+    [Tooltip("A name of tag (defined in config-L2N.json)")]
+    public string tagForward = "Pusher#Forward";
+    [Tooltip("A name of tag (defined in config-L2N.json)")]
+    public string tagBackward = "Pusher#Backward";
+    
     [Tooltip("A name of tag (defined in config-L2N.json)")]
     public string tagSwitchStart = "SwitchPusher#Start";
     [Tooltip("A name of tag (defined in config-L2N.json)")]
     public string tagSwitchEnd = "SwitchPusher#End";
-    [Tooltip("A name of tag (defined in config-L2N.json)")]
-    public string tagDirection = "Pusher#Direction";
-    [Tooltip("A name of tag (defined in config-L2N.json)")]
-    public string tagMovement = "Pusher#Movement";
+    
     [Tooltip("How should direction be treated. If false, pusher moves forward when direction is 1.")]
     public bool reversePolarity = false;
     public float speed = 0.5f;
@@ -136,16 +138,16 @@ public class Pusher : MonoBehaviour
         }
 
         // Movement control
-        if (com.ReadCoil(tagMovement))
+        bool forward = com.ReadCoil(tagForward);
+        bool backward = com.ReadCoil(tagBackward);
+        // Hvis begge er like (enten begge av eller begge på) står den stille
+        if (forward && !backward)
         {
-            if (com.ReadCoil(tagDirection) ^ reversePolarity)
-            {
-                MoveBackward();
-            }
-            else
-            {
-                MoveForward();
-            }
+            MoveForward();
+        }
+        else if (backward && !forward)
+        {
+            MoveBackward();
         }
     }
 

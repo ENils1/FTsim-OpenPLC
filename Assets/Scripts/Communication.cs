@@ -6,7 +6,6 @@ using System.Net.Sockets;
 using System.Text;
 using System.Threading;
 using Newtonsoft.Json;
-using UnityEditor.VersionControl;
 
 
 public class Communication : MonoBehaviour
@@ -18,12 +17,14 @@ public class Communication : MonoBehaviour
     // Mapper for input- og output-tags
     private Dictionary<string, string> outputTagToAddress = new();
     private Dictionary<string, string> inputTagToAddress = new();
-
+    
+    UDPCommunication udpCommunication;
     private TcpClient client;
     private NetworkStream stream;
     private Thread receiveThread;
     // Brukes for å lagre mottatte coil-verdier
     private Dictionary<string, bool> coilValues = new();
+    private Dictionary<string, int> discreteValues = new();
     // Lås for trådsikker tilgang til coilValues
     private readonly object coilValuesLock = new();
 
@@ -40,6 +41,8 @@ public class Communication : MonoBehaviour
         {
             ConfigFileLoad();
             TCPConnect();
+            
+            UpdateDiscreteValues();
         }
         catch (Exception ex)
         {
@@ -59,7 +62,7 @@ public class Communication : MonoBehaviour
         try
         {
             client = new TcpClient();
-            client.Connect("127.0.0.1", 5000);
+            client.Connect(appConfig.ip, appConfig.port);
             stream = client.GetStream();
             
             // Start mottaketråden
@@ -69,11 +72,25 @@ public class Communication : MonoBehaviour
             
             Debug.Log("TCP CONNECTED...");
             panelStatusBar.SetStatusBarText("Connected to OpenPLC");
+
         }
         catch (Exception ex)
         {
             Debug.LogError("Error connecting: " + ex.Message);
         }
+    }
+
+    private void UpdateDiscreteValues()
+    {
+        
+        WriteDiscreteInput("PhotocellEntry", 1);
+        WriteDiscreteInput("PhotocellBelt1", 1);
+        WriteDiscreteInput("PhotocellBelt2", 1);
+        WriteDiscreteInput("PhotocellBelt3", 1);
+        WriteDiscreteInput("PhotocellExit", 1);
+        WriteDiscreteInput("SwitchPusher1Start", 1);
+        WriteDiscreteInput("SwitchPusher2Start", 1);
+        
     }
     
     private void ReceiveLoop()
@@ -145,6 +162,7 @@ public class Communication : MonoBehaviour
     public void WriteDiscreteInput(string tag, int value)
     {   
         string address = inputTagToAddress[tag];
+        discreteValues[tag] = value;
         var command = new
         {
             action = "set_IX",

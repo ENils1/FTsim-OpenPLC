@@ -228,6 +228,10 @@ public class Communication : MonoBehaviour
                 "Retry", () => { Awake(); }, widthMax: 300, heightMax: 120
             );
         }
+        else
+        {
+            
+        }
     }
 
     private void ConfigFileLoad()

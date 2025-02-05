@@ -6,7 +6,7 @@ public class AppConfig
 {
     public string ip;
     public int port;
-    public bool showFPS;
+    public bool ShowFPS;
     public Dictionary<string, string> InputVariableMap;
     public Dictionary<string, string> OutputVariableMap;
     public Dictionary<string, string> TrainingModelSpecific;

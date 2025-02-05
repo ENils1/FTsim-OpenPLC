@@ -18,7 +18,6 @@ public class Communication : MonoBehaviour
     private Dictionary<string, string> outputTagToAddress = new();
     private Dictionary<string, string> inputTagToAddress = new();
     
-    UDPCommunication udpCommunication;
     private TcpClient client;
     private NetworkStream stream;
     private Thread receiveThread;
@@ -222,6 +221,12 @@ public class Communication : MonoBehaviour
         {
             Debug.LogWarning("Lost connection to OpenPLC. Reconnecting...");
             TCPConnect();
+            Dialog.MessageBox(
+                "Dialog_error_PLC_connection",
+                "Connection error",
+                $"The connection with the OpenPLC cannot be established. Address in the config file is:\n{appConfig.ip}, {appConfig.port}",
+                "Retry", () => { Awake(); }, widthMax: 300, heightMax: 120
+            );
         }
     }
 

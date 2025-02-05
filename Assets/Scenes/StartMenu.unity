@@ -1556,7 +1556,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: FTsim ADS
+  m_text: FTsim OpenPLC
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: e713163fdd74d2c4cbb5ed2c749390b2, type: 2}
   m_sharedMaterial: {fileID: -480082330746967563, guid: e713163fdd74d2c4cbb5ed2c749390b2,

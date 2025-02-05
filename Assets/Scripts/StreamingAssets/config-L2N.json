@@ -1,6 +1,6 @@
 {
-  "IP": "10.22.173.117",
-  "Port": 5000,
+  "ip": "127.0.0.1",
+  "port": 5000,
   "ShowFPS": true,
   "InputVariableMap": {
     "PhotocellEntry": "IX1.0",

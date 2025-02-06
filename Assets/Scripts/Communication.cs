@@ -51,7 +51,7 @@ public class Communication : MonoBehaviour
 
     void Start()
     {
-        InvokeRepeating(nameof(CheckConnection), 1f, 5f);
+        InvokeRepeating(nameof(CheckConnection), 5f, 5f);
         MessageReceived += OnMessageReceived;
     }
     
@@ -64,12 +64,11 @@ public class Communication : MonoBehaviour
             client.Connect(appConfig.ip, appConfig.port);
             stream = client.GetStream();
             
-            // Start mottaketråden
             receiveThread = new Thread(ReceiveLoop);
             receiveThread.IsBackground = true;
             receiveThread.Start();
             
-            Debug.Log("TCP CONNECTED...");
+            //Debug.Log("TCP CONNECTED...");
             panelStatusBar.SetStatusBarText("Connected to OpenPLC");
 
         }
@@ -220,17 +219,23 @@ public class Communication : MonoBehaviour
         if (client == null || !client.Connected)
         {
             Debug.LogWarning("Lost connection to OpenPLC. Reconnecting...");
-            TCPConnect();
-            Dialog.MessageBox(
-                "Dialog_error_PLC_connection",
-                "Connection error",
-                $"The connection with the OpenPLC cannot be established. Address in the config file is:\n{appConfig.ip}, {appConfig.port}",
-                "Retry", () => { Awake(); }, widthMax: 300, heightMax: 120
-            );
+            if (GameObject.FindWithTag("Dialog_error_PLC_connection") == null)
+            {
+                Dialog.MessageBox(
+                    "Dialog_error_PLC_connection",
+                    "Connection error",
+                    $"The connection with OpenPLC cannot be established. Address in the config file is:\n{appConfig.ip}, {appConfig.port}",
+                    "Retry", () => { TCPConnect(); }, widthMax: 300, heightMax: 120
+                );
+            }
         }
         else
         {
-            
+            GameObject errorDialog = GameObject.Find("Dialog_error_PLC_connection");
+            if (errorDialog != null)
+            {
+                Destroy(errorDialog);
+            }
         }
     }
 
@@ -286,7 +291,7 @@ public class Communication : MonoBehaviour
         if (client != null && client.Connected)
         {
             Disconnect();
-            Debug.Log("Disconnected from Modbus PLC");
+            Debug.Log("Disconnected from OpenPLC");
         }
     }
 }

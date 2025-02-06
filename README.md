@@ -1,4 +1,5 @@
 # FTsim-OpenPLC
+![Skjermbilde 2025-02-06 125758](https://github.com/user-attachments/assets/fab16526-bf24-47c7-a8c1-2de4f054a633)
 
 FTsim-OpenPLC is a Unity simulation tool for Fischertechnik training models that uses TCP communication to interface with an OpenPLC Runtime server. It currently supports only an **Indexed Line with two machine stations**.
 

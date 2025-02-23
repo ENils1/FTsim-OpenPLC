@@ -73,15 +73,15 @@ def handle_connection(conn):
         if time.time() - last_qx_update >= 0.01:
             qx_updates = {}
             for index in range(10):
-                part1 = index // 8
-                part2 = index % 8
-                address = f"QX{part1}.{part2}"
+                msb = index // 8
+                lsb = index % 8
+                address = f"QX{msb}.{lsb}"
                 qx_updates[address] = psm.get_var(address)
             json_update = json.dumps(qx_updates)
             try:
                 conn.sendall(json_update.encode('utf-8'))
-                current_time = time.strftime("%H:%M:%S", time.localtime())
-                print(f"[Server] Sent QX update ({current_time}): {json_update}")
+                #current_time = time.strftime("%H:%M:%S", time.localtime())
+                #print(f"[Server] Sent QX update ({current_time}): {json_update}")
             except Exception as e:
                 print("[Server] Send error:", e)
                 break

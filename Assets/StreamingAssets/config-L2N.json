@@ -2,6 +2,7 @@
   "ip": "127.0.0.1",
   "port": 5000,
   "ShowFPS": true,
+  "MaxFPS": 60,
   "InputVariableMap": {
     "PhotocellEntry": "IX1.0",
     "PhotocellBelt1": "IX0.6",

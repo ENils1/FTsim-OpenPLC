@@ -1,12 +1,10 @@
 ﻿using UnityEngine;
 using System;
 using System.Collections.Generic;
-using UnityEngine.SceneManagement;
-using System.Net.Sockets;
-using System.Text;
-using System.Threading;
+using System.Collections.Concurrent;
 using Newtonsoft.Json;
-
+using WebSocketSharp;
+using UnityEngine.SceneManagement;
 
 public class Communication : MonoBehaviour
 {
@@ -14,34 +12,29 @@ public class Communication : MonoBehaviour
     public AppConfig appConfig;
     public StatusBar panelStatusBar;
 
-    // Mapper for input- og output-tags
     private Dictionary<string, string> outputTagToAddress = new();
     private Dictionary<string, string> inputTagToAddress = new();
-    
-    private TcpClient client;
-    private NetworkStream stream;
-    private Thread receiveThread;
-    // Brukes for å lagre mottatte coil-verdier
     private Dictionary<string, bool> coilValues = new();
     private Dictionary<string, int> discreteValues = new();
-    // Lås for trådsikker tilgang til coilValues
     private readonly object coilValuesLock = new();
 
-    // Event for mottatte meldinger
-    public event Action<string> MessageReceived;
+    private WebSocket ws;
+    private ConcurrentQueue<string> messageQueue = new ConcurrentQueue<string>();
+    private const int MAX_MESSAGES_PER_FRAME = 2;
+    private float reconnectDelay = 1f;
+    private float lastReconnectAttempt = -1f;
 
-    public bool IsConnected => client != null && client.Connected;
+    public bool IsConnected => ws != null && ws.ReadyState == WebSocketState.Open;
 
     void Awake()
     {
         Application.runInBackground = true;
-        Debug.Log("Communication: Connecting to OpenPLC...");
+        Application.targetFrameRate = appConfig.maxFPS;
+        Debug.Log("Communication: Initializing...");
         try
         {
             ConfigFileLoad();
-            TCPConnect();
-            
-            UpdateDiscreteValues();
+            InitializeWebSocket();
         }
         catch (Exception ex)
         {
@@ -51,192 +44,168 @@ public class Communication : MonoBehaviour
 
     void Start()
     {
-        InvokeRepeating(nameof(CheckConnection), 5f, 5f);
-        MessageReceived += OnMessageReceived;
-    }
-    
-    
-    public void TCPConnect()
-    {   
-        try
-        {
-            client = new TcpClient();
-            client.Connect(appConfig.ip, appConfig.port);
-            stream = client.GetStream();
-            
-            receiveThread = new Thread(ReceiveLoop);
-            receiveThread.IsBackground = true;
-            receiveThread.Start();
-            
-            //Debug.Log("TCP CONNECTED...");
-            panelStatusBar.SetStatusBarText("Connected to OpenPLC");
+        // Initialize WebSocket with the correct URL
+        string url = $"ws://{appConfig.ip}:{appConfig.port}";
+        ws = new WebSocket(url);
 
-        }
-        catch (Exception ex)
+        ws.OnOpen += (sender, e) =>
         {
-            Debug.LogError("Error connecting: " + ex.Message);
-        }
-    }
-
-    private void UpdateDiscreteValues()
-    {
-        
-        WriteDiscreteInput("PhotocellEntry", 1);
-        WriteDiscreteInput("PhotocellBelt1", 1);
-        WriteDiscreteInput("PhotocellBelt2", 1);
-        WriteDiscreteInput("PhotocellBelt3", 1);
-        WriteDiscreteInput("PhotocellExit", 1);
-        WriteDiscreteInput("SwitchPusher1Start", 1);
-        WriteDiscreteInput("SwitchPusher2Start", 1);
-        
-    }
-    
-    private void ReceiveLoop()
-    {
-        try
-        {
-            byte[] buffer = new byte[1024];
-            while (true)
-            {
-                // Blokkerende kall: leser data fra stream
-                int bytesRead = stream.Read(buffer, 0, buffer.Length);
-                if (bytesRead == 0)
-                {
-                    // Forbindelsen ble avsluttet fra serverens side
-                    break;
-                }
-                // Konverter mottatte bytes til tekst (for eksempel JSON)
-                string message = Encoding.UTF8.GetString(buffer, 0, bytesRead);
-                // Utløser eventen dersom noen har abonnert på den
-                MessageReceived?.Invoke(message);
-            }
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine("Error receiving data: " + ex.Message);
-            
-        }
-        finally
-        {
-            Disconnect();
-        }
-    }
-
-    public void SendMessage(string message)
-    {
-        if (IsConnected)
-        {
-            byte[] data = Encoding.UTF8.GetBytes(message);
-            try
-            {
-                stream.Write(data, 0, data.Length);
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine("Error sending message: " + ex.Message);
-            }
-        }
-        else
-        {
-            Console.WriteLine("Cannot send message. Not connected.");
-        }
-    }
-    
-    public void Disconnect()
-    {
-        try
-        {
-            stream?.Close();
-            client?.Close();
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine("Error during disconnect: " + ex.Message);
-        }
-        Console.WriteLine("Disconnected from server.");
-    }
-    
-    
-    public void WriteDiscreteInput(string tag, int value)
-    {   
-        string address = inputTagToAddress[tag];
-        discreteValues[tag] = value;
-        var command = new
-        {
-            action = "set_IX",
-            address,
-            value
+            Debug.Log("WebSocket connected.");
+            OnConnected();
         };
-        string jsonCommand = JsonConvert.SerializeObject(command);
-        SendMessage(jsonCommand);
-        //Debug.Log("Sent command: " + jsonCommand);
+
+        ws.OnClose += (sender, e) =>
+        {
+            Debug.Log("WebSocket disconnected. Reason: " + e.Reason);
+            OnDisconnected();
+        };
+
+        ws.OnError += (sender, e) =>
+        {
+            Debug.LogError("WebSocket error: " + e.Message);
+            if (e.Exception != null)
+            {
+                Debug.LogError("Exception details: " + e.Exception);
+            }
+        };
+
+        ws.OnMessage += (sender, e) =>
+        {
+            Debug.Log("Message received: " + e.Data);
+            messageQueue.Enqueue(e.Data);
+        };
+
+        // Attempt to connect asynchronously
+        ws.ConnectAsync();
     }
-    
-    private void OnMessageReceived(string message)
+
+    void Update()
     {
-        //Debug.Log("Received: " + message);
+        float startTime = Time.realtimeSinceStartup;
+
+        int processedCount = 0;
+        while (processedCount < MAX_MESSAGES_PER_FRAME && messageQueue.TryDequeue(out string message))
+        {
+            ProcessMessage(message);
+            processedCount++;
+        }
+
+        if (processedCount > 0)
+        {
+            Debug.Log($"Processed {processedCount} messages this frame");
+        }
+        if (messageQueue.Count > 0)
+        {
+            Debug.LogWarning($"Queue backlog: {messageQueue.Count} messages remaining");
+        }
+
+        if (!IsConnected && Time.time - lastReconnectAttempt > reconnectDelay)
+        {
+            Reconnect();
+            lastReconnectAttempt = Time.time;
+        }
+
+        float frameTime = (Time.realtimeSinceStartup - startTime) * 1000;
+        if (frameTime > 50)
+        {
+            Debug.LogWarning($"Frame time exceeded 50ms: {frameTime:F2}ms");
+        }
+    }
+
+    private void InitializeWebSocket()
+    {
+        ws = new WebSocket($"ws://{appConfig.ip}:{appConfig.port}");
+        ws.ConnectAsync();
+    }
+
+    private void Reconnect()
+    {
+        if (ws.ReadyState != WebSocketState.Connecting && ws.ReadyState != WebSocketState.Open)
+        {
+            Debug.Log("Attempting to reconnect WebSocket...");
+            ws.ConnectAsync();
+        }
+    }
+
+    private void ProcessMessage(string message)
+    {
         try
         {
-            // Deserialiser JSON-strengen til en dictionary
-            var data = JsonConvert.DeserializeObject<Dictionary<string, bool>>(message);
+            var data = JsonConvert.DeserializeObject<Dictionary<string, object>>(message);
             if (data != null)
             {
-                foreach (var entry in data)
+                if (data.ContainsKey("action"))
                 {
-                    // Oppdaterer coilValues med hver key/value-par
-                    coilValues[entry.Key] = entry.Value;
-                    //Debug.Log($"Output update: {entry.Key} = {entry.Value}");
+                    string action = data["action"].ToString();
+                    if (action == "ping")
+                    {
+                        if (IsConnected)
+                        {
+                            ws.Send(JsonConvert.SerializeObject(new { action = "pong" }));
+                            Debug.Log("Received ping, sent pong");
+                        }
+                        return;
+                    }
+                }
+
+                var coilData = JsonConvert.DeserializeObject<Dictionary<string, bool>>(message);
+                if (coilData != null)
+                {
+                    lock (coilValuesLock)
+                    {
+                        foreach (var entry in coilData)
+                        {
+                            coilValues[entry.Key] = entry.Value;
+                        }
+                    }
                 }
             }
         }
-        catch (Exception ex)
+        catch (JsonException ex)
         {
-            Debug.LogError("Error parsing JSON: " + ex.Message);
+            Debug.LogError($"Error parsing JSON: {ex.Message}");
         }
     }
-    
+
+    public void WriteDiscreteInput(string tag, int value)
+    {
+        string address = inputTagToAddress[tag];
+        discreteValues[tag] = value;
+        var command = new { action = "set_IX", address, value };
+        if (IsConnected)
+        {
+            ws.Send(JsonConvert.SerializeObject(command));
+        }
+    }
+
     public bool ReadCoil(string tag)
     {
         lock (coilValuesLock)
         {
             string address = outputTagToAddress[tag];
-            if (coilValues.ContainsKey(address))
-            {
-                bool value = coilValues[address];
-                //Debug.Log($"Coil {address} value: {value}");
-                return value;
-            } 
+            return coilValues.ContainsKey(address) ? coilValues[address] : false;
         }
-        
-        //Debug.LogWarning($"Coil {tag} not found (ingen oppdatering mottatt ennå).");
-        return false;
     }
 
-    
-
-    private void CheckConnection()
+    private void OnConnected()
     {
-        if (client == null || !client.Connected)
+        // Dispatch UI updates to the main thread.
+        MainThreadDispatcher.Enqueue(() =>
         {
-            Debug.LogWarning("Lost connection to OpenPLC. Reconnecting...");
-            if (GameObject.FindWithTag("Dialog_error_PLC_connection") == null)
-            {
-                Dialog.MessageBox(
-                    "Dialog_error_PLC_connection",
-                    "Connection error",
-                    $"The connection with OpenPLC cannot be established. Address in the config file is:\n{appConfig.ip}, {appConfig.port}",
-                    "Retry", () => { TCPConnect(); }, widthMax: 300, heightMax: 120
-                );
-            }
-        }
-        else
+            panelStatusBar.SetStatusBarText("Connected to OpenPLC");
+        });
+        Debug.Log("WebSocket Connected");
+        reconnectDelay = 1f; // Reset delay on successful connection
+    }
+
+    private void OnDisconnected()
+    {
+        MainThreadDispatcher.Enqueue(() =>
         {
-            GameObject errorDialog = GameObject.Find("Dialog_error_PLC_connection");
-            if (errorDialog != null)
-            {
-                Destroy(errorDialog);
-            }
-        }
+            panelStatusBar.SetStatusBarText("Disconnected from OpenPLC");
+        });
+        Debug.Log("WebSocket Disconnected");
+        reconnectDelay = Mathf.Min(reconnectDelay * 2, 30f); // Exponential backoff, max 30s
     }
 
     private void ConfigFileLoad()
@@ -255,7 +224,7 @@ public class Communication : MonoBehaviour
             Debug.LogError($"ConfigFileLoad Error: {ex.Message}");
         }
     }
-    
+
     public void ConfigFileSave()
     {
         string sceneName = SceneManager.GetActiveScene().name;
@@ -264,7 +233,10 @@ public class Communication : MonoBehaviour
         {
             configFilePath = System.IO.Path.Combine(Application.streamingAssetsPath, configFile);
             ConfigFileManager.SaveConfig(configFilePath, appConfig);
-            panelStatusBar.SetStatusBarText($"Configuration saved to {configFile}.");
+            MainThreadDispatcher.Enqueue(() =>
+            {
+                panelStatusBar.SetStatusBarText($"Configuration saved to {configFile}.");
+            });
         }
         catch (Exception ex)
         {
@@ -279,7 +251,6 @@ public class Communication : MonoBehaviour
         {
             inputTagToAddress[entry.Key] = entry.Value;
         }
-
         foreach (var entry in appConfig.OutputVariableMap)
         {
             outputTagToAddress[entry.Key] = entry.Value;
@@ -288,10 +259,10 @@ public class Communication : MonoBehaviour
 
     void OnApplicationQuit()
     {
-        if (client != null && client.Connected)
+        if (ws != null && ws.ReadyState != WebSocketState.Closed)
         {
-            Disconnect();
-            Debug.Log("Disconnected from OpenPLC");
+            ws.Close();
         }
+        Debug.Log("Application quitting, WebSocket disconnected");
     }
 }

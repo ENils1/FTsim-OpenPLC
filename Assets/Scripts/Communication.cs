@@ -1,14 +1,13 @@
 ﻿using UnityEngine;
 using System;
+using System.Collections;
 using System.Collections.Generic;
-using System.Collections.Concurrent;
 using Newtonsoft.Json;
 using WebSocketSharp;
 using UnityEngine.SceneManagement;
 
 public class Communication : MonoBehaviour
 {
-    private string configFilePath;
     public AppConfig appConfig;
     public StatusBar panelStatusBar;
 
@@ -19,22 +18,21 @@ public class Communication : MonoBehaviour
     private readonly object coilValuesLock = new();
 
     private WebSocket ws;
-    private ConcurrentQueue<string> messageQueue = new ConcurrentQueue<string>();
-    private const int MAX_MESSAGES_PER_FRAME = 2;
-    private float reconnectDelay = 1f;
-    private float lastReconnectAttempt = -1f;
+    private float lastMessageReceivedTime;
+    private const float MESSAGE_TIMEOUT = 3f; // Timeout if no message is received within 3 seconds.
 
     public bool IsConnected => ws != null && ws.ReadyState == WebSocketState.Open;
 
     void Awake()
     {
         Application.runInBackground = true;
-        Application.targetFrameRate = appConfig.maxFPS;
         Debug.Log("Communication: Initializing...");
         try
         {
             ConfigFileLoad();
             InitializeWebSocket();
+            Application.targetFrameRate = appConfig.MaxFPS;
+            QualitySettings.vSyncCount = appConfig.vSync ? 1 : 0;
         }
         catch (Exception ex)
         {
@@ -44,9 +42,7 @@ public class Communication : MonoBehaviour
 
     void Start()
     {
-        // Initialize WebSocket with the correct URL
-        string url = $"ws://{appConfig.ip}:{appConfig.port}";
-        ws = new WebSocket(url);
+        ws = new WebSocket($"ws://{appConfig.ip}:{appConfig.port}");
 
         ws.OnOpen += (sender, e) =>
         {
@@ -72,44 +68,17 @@ public class Communication : MonoBehaviour
         ws.OnMessage += (sender, e) =>
         {
             Debug.Log("Message received: " + e.Data);
-            messageQueue.Enqueue(e.Data);
+            MainThreadDispatcher.Enqueue(() =>
+            {
+                lastMessageReceivedTime = Time.time; // Update last received message timestamp.
+            });
+
+            ProcessMessage(e.Data);
         };
 
-        // Attempt to connect asynchronously
         ws.ConnectAsync();
-    }
 
-    void Update()
-    {
-        float startTime = Time.realtimeSinceStartup;
-
-        int processedCount = 0;
-        while (processedCount < MAX_MESSAGES_PER_FRAME && messageQueue.TryDequeue(out string message))
-        {
-            ProcessMessage(message);
-            processedCount++;
-        }
-
-        if (processedCount > 0)
-        {
-            Debug.Log($"Processed {processedCount} messages this frame");
-        }
-        if (messageQueue.Count > 0)
-        {
-            Debug.LogWarning($"Queue backlog: {messageQueue.Count} messages remaining");
-        }
-
-        if (!IsConnected && Time.time - lastReconnectAttempt > reconnectDelay)
-        {
-            Reconnect();
-            lastReconnectAttempt = Time.time;
-        }
-
-        float frameTime = (Time.realtimeSinceStartup - startTime) * 1000;
-        if (frameTime > 50)
-        {
-            Debug.LogWarning($"Frame time exceeded 50ms: {frameTime:F2}ms");
-        }
+        StartCoroutine(TimeoutChecker()); // Start the timeout monitoring coroutine.
     }
 
     private void InitializeWebSocket()
@@ -134,20 +103,6 @@ public class Communication : MonoBehaviour
             var data = JsonConvert.DeserializeObject<Dictionary<string, object>>(message);
             if (data != null)
             {
-                if (data.ContainsKey("action"))
-                {
-                    string action = data["action"].ToString();
-                    if (action == "ping")
-                    {
-                        if (IsConnected)
-                        {
-                            ws.Send(JsonConvert.SerializeObject(new { action = "pong" }));
-                            Debug.Log("Received ping, sent pong");
-                        }
-                        return;
-                    }
-                }
-
                 var coilData = JsonConvert.DeserializeObject<Dictionary<string, bool>>(message);
                 if (coilData != null)
                 {
@@ -189,13 +144,13 @@ public class Communication : MonoBehaviour
 
     private void OnConnected()
     {
-        // Dispatch UI updates to the main thread.
         MainThreadDispatcher.Enqueue(() =>
         {
             panelStatusBar.SetStatusBarText("Connected to OpenPLC");
+            lastMessageReceivedTime = Time.time; // Reset timeout timer on connect.
         });
         Debug.Log("WebSocket Connected");
-        reconnectDelay = 1f; // Reset delay on successful connection
+        
     }
 
     private void OnDisconnected()
@@ -203,9 +158,41 @@ public class Communication : MonoBehaviour
         MainThreadDispatcher.Enqueue(() =>
         {
             panelStatusBar.SetStatusBarText("Disconnected from OpenPLC");
+            ShowTimeoutDialog();
         });
         Debug.Log("WebSocket Disconnected");
-        reconnectDelay = Mathf.Min(reconnectDelay * 2, 30f); // Exponential backoff, max 30s
+    }
+
+    private void ShowTimeoutDialog()
+    {
+        if (GameObject.FindWithTag("Dialog_error_PLC_connection") == null)
+        {
+            Dialog.MessageBox(
+                "Dialog_error_PLC_connection",
+                "Connection error",
+                $"The connection with OpenPLC cannot be maintained.\nAddress: {appConfig.ip}, {appConfig.port}",
+                "Retry",
+                () => { Reconnect(); },
+                widthMax: 300,
+                heightMax: 120
+            );
+        }
+    }
+
+    IEnumerator TimeoutChecker()
+    {
+        while (true)
+        {
+            yield return new WaitForSeconds(1f); // Check every second.
+            
+            float timeSinceLastMessage = Time.time - lastMessageReceivedTime;
+
+            if (timeSinceLastMessage > MESSAGE_TIMEOUT)
+            {
+                Debug.LogWarning("No message received for " + timeSinceLastMessage + " seconds. Showing timeout dialog.");
+                OnDisconnected();
+            }
+        }
     }
 
     private void ConfigFileLoad()
@@ -214,7 +201,7 @@ public class Communication : MonoBehaviour
         string configFile = "config-" + sceneName + ".json";
         try
         {
-            configFilePath = System.IO.Path.Combine(Application.streamingAssetsPath, configFile);
+            string configFilePath = System.IO.Path.Combine(Application.streamingAssetsPath, configFile);
             appConfig = ConfigFileManager.LoadConfig(configFilePath);
             MapTags();
             Debug.Log($"Config file loaded: {configFilePath}");
@@ -231,7 +218,7 @@ public class Communication : MonoBehaviour
         string configFile = "config-" + sceneName + ".json";
         try
         {
-            configFilePath = System.IO.Path.Combine(Application.streamingAssetsPath, configFile);
+            string configFilePath = System.IO.Path.Combine(Application.streamingAssetsPath, configFile);
             ConfigFileManager.SaveConfig(configFilePath, appConfig);
             MainThreadDispatcher.Enqueue(() =>
             {

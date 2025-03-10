@@ -36,21 +36,15 @@ import json
 import time
 import threading
 import logging
-import socket  # For SO_REUSEADDR
+import socket
 import psm
 
-# Configure logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-logger = logging.getLogger(__name__)
-
-# Server configuration - Do not change unless you know what you are doing
-HOST = '0.0.0.0'
-PORT = 5000
-UPDATE_INTERVAL = 0.1  # 10 Hz updates
+UPDATE_INTERVAL = 0.1
+NUMBER_OF_OUTPUTS = 10
 
 class WebSocketPLCServer:
     def __init__(self):
-        self.server = WebsocketServer(host=HOST, port=PORT)
+        self.server = WebsocketServer(host="0.0.0.0", port=5000)
         self.server.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.clients = {}  # {client_id: (client, last_heartbeat, active)}
         self.clients_lock = threading.Lock()
@@ -107,13 +101,13 @@ class WebSocketPLCServer:
         """Process incoming messages from client"""
         try:
             command = json.loads(message)
-            logger.debug(f"Received command: {command}")
+            #print(f"Received command: {command}")
             if command.get("action") == "set_IX":
                 psm.set_var(command.get("address"), command.get("value"))
         except json.JSONDecodeError as e:
-            logger.error(f"Invalid JSON: {e} - Data: {message}")
+            print(f"Invalid JSON: {e} - Data: {message}")
         except Exception as e:
-            logger.error(f"Processing error: {e}")
+            print(f"Processing error: {e}")
 
     def broadcast_updates(self):
         """Broadcast QX updates to all clients"""
@@ -135,16 +129,16 @@ class WebSocketPLCServer:
     def get_qx_updates(self):
         """Generate QX updates from PSM values"""
         qx_updates = {}
-        for index in range(10):
+        for index in range(NUMBER_OF_OUTPUTS):
             msb = index // 8
             lsb = index % 8
             address = f"QX{msb}.{lsb}"
             try:
                 qx_updates[address] = psm.get_var(address)
             except Exception as e:
-                logger.error(f"Error getting variable {address}: {e}")
+                print(f"Error getting variable {address}: {e}")
         return qx_updates
-
+    
     def stop(self):
         """Stop the server"""
         self.running = False
@@ -157,16 +151,10 @@ class WebSocketPLCServer:
 
 def main():
     server = WebSocketPLCServer()
-    try:
-        server.start()
-        while (not psm.should_quit()):
-            time.sleep(0.1)
-        else:
-            server.stop()
-    except KeyboardInterrupt:
-        print("Shutting down server...")
-    finally:
-        server.stop()
+	server.start()
+	while (not psm.should_quit()):
+		time.sleep(0.1)
+	server.stop()
 
 if __name__ == "__main__":
     main()

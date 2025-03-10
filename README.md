@@ -19,15 +19,17 @@ FTsim-OpenPLC is a Unity simulation tool for Fischertechnik training models that
 
 - Edit the configuration file at **FTsim-OpenPLC_Data\StreamingAssets\config-L2N.json** to set your OpenPLC connection details and I/O addresses.
 
-### OpenPLC Python SubModule (PSM)
+## OpenPLC Python SubModule (PSM)
 Driver for OpenPLC Runtime. 
 
-Install package: websocket-server
+#### Install package: websocket-server
 
-Raspberry Pi:
+Raspberry Pi terminal:
+```
 source OpenPLC_v3/.venv/bin/activate
 pip install websocket-server
-
+```
+Copy the driver to the hardware section of the OpenPLC-Runtime, select PSM. 
 ```
 from websocket_server import WebsocketServer
 import json
@@ -120,14 +122,13 @@ class WebSocketPLCServer:
                 qx_updates = self.get_qx_updates()
                 json_update = json.dumps(qx_updates)
                 data_size = len(json_update.encode('utf-8'))
-                logger.info(f"Sending QX update ({data_size} bytes)")
                 with self.clients_lock:
                     for client_id in list(self.clients.keys()):
                         client, _, active = self.clients[client_id]
                         if active:
                             self.server.send_message(client, json_update)
             except Exception as e:
-                logger.error(f"Broadcast error: {e}")
+                print(f"Broadcast error: {e}")
                 time.sleep(1)
             time.sleep(UPDATE_INTERVAL)
 

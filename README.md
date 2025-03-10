@@ -35,18 +35,19 @@ from websocket_server import WebsocketServer
 import json
 import time
 import threading
-import logging
 import socket
 import psm
 
 UPDATE_INTERVAL = 0.1
 NUMBER_OF_OUTPUTS = 10
+HOST = "0.0.0.0"
+PORT = 5000
 
 class WebSocketPLCServer:
     def __init__(self):
-        self.server = WebsocketServer(host="0.0.0.0", port=5000)
+        self.server = WebsocketServer(host=HOST, port=PORT)
         self.server.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        self.clients = {}  # {client_id: (client, last_heartbeat, active)}
+        self.clients = {}  # {client_id: client_instance}
         self.clients_lock = threading.Lock()
         self.running = False
 
@@ -79,31 +80,28 @@ class WebSocketPLCServer:
             psm.set_var("IX1.2", True)
             psm.set_var("IX0.3", True)
             psm.set_var("IX0.5", True)
-            logger.info("PSM initialized")
+            print("PSM initialized")
         except Exception as e:
-            logger.error(f"PSM initialization error: {e}")
+            print(f"PSM initialization error: {e}")
 
     def new_client(self, client, server):
         """Handle new client connection"""
         with self.clients_lock:
-            # Record the time of connection.
-            self.clients[client['id']] = (client, time.time(), True)
+            self.clients[client['id']] = client
         print(f"New client connected: {client['id']}")
 
     def client_left(self, client, server):
         """Handle client disconnection"""
         with self.clients_lock:
-            if client['id'] in self.clients:
-                del self.clients[client['id']]
+            self.clients.pop(client['id'], None)
         print(f"Client disconnected: {client['id']}")
 
     def message_received(self, client, server, message):
-        """Process incoming messages from client"""
+        """Process incoming messages"""
         try:
-            command = json.loads(message)
-            #print(f"Received command: {command}")
-            if command.get("action") == "set_IX":
-                psm.set_var(command.get("address"), command.get("value"))
+            data = json.loads(message)
+            if data.get('type') == "set_IX":
+                psm.set_var(data['address'], data['value'])
         except json.JSONDecodeError as e:
             print(f"Invalid JSON: {e} - Data: {message}")
         except Exception as e:
@@ -112,33 +110,26 @@ class WebSocketPLCServer:
     def broadcast_updates(self):
         """Broadcast QX updates to all clients"""
         while self.running:
-            try:
-                qx_updates = self.get_qx_updates()
-                json_update = json.dumps(qx_updates)
-                data_size = len(json_update.encode('utf-8'))
-                with self.clients_lock:
-                    for client_id in list(self.clients.keys()):
-                        client, _, active = self.clients[client_id]
-                        if active:
-                            self.server.send_message(client, json_update)
-            except Exception as e:
-                print(f"Broadcast error: {e}")
-                time.sleep(1)
+            qx_updates = self.get_qx_updates()
+            with self.clients_lock:
+                for client in self.clients.values():
+                    try:
+                        self.server.send_message(client, json.dumps(qx_updates))
+                    except Exception as e:
+                        print(f"Broadcast error to client {client['id']}: {e}")
             time.sleep(UPDATE_INTERVAL)
 
     def get_qx_updates(self):
-        """Generate QX updates from PSM values"""
+        """Get QX updates from PSM"""
         qx_updates = {}
         for index in range(NUMBER_OF_OUTPUTS):
-            msb = index // 8
-            lsb = index % 8
-            address = f"QX{msb}.{lsb}"
+            address = f"QX{index}"
             try:
                 qx_updates[address] = psm.get_var(address)
             except Exception as e:
                 print(f"Error getting variable {address}: {e}")
         return qx_updates
-    
+
     def stop(self):
         """Stop the server"""
         self.running = False
@@ -149,15 +140,12 @@ class WebSocketPLCServer:
             print(f"Error stopping PSM: {e}")
         print("Server stopped")
 
-def main():
-    server = WebSocketPLCServer()
-	server.start()
-	while (not psm.should_quit()):
-		time.sleep(0.1)
-	server.stop()
-
 if __name__ == "__main__":
-    main()
+    server = WebSocketPLCServer()
+    server.start()
+    while True:
+        time.sleep(0.1)
+    server.stop()
 
 ```
 

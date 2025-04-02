@@ -1,19 +1,19 @@
 # FTsim-OpenPLC
 ![Skjermbilde 2025-02-06 125758](https://github.com/user-attachments/assets/fab16526-bf24-47c7-a8c1-2de4f054a633)
 
-FTsim-OpenPLC is a Unity simulation tool for Fischertechnik training models that uses TCP communication to interface with an OpenPLC Runtime server. It currently supports only an **Indexed Line with two machine stations**.
+FTsim-OpenPLC is a Unity simulation tool for Fischertechnik training models that uses WebSocket communication to interface with an OpenPLC Runtime server. It currently supports only **Indexed Line with two machine stations**.
 
 ## Features
 
 - **Indexed Line Simulation:** Only supports an Indexed Line with two machine stations.
-- **TCP Communication:** Data exchange with an OpenPLC server using TCP.
+- **WebSocket Communication:** Data exchange with an OpenPLC server using WebSocket and JSON.
 - **OpenPLC Runtime PSM:** OpenPLC Runtime PSM driver.
 
 ## Getting Started
 
 ### Prerequisites
 
-- **OpenPLC Runtime:** An operational OpenPLC server with TCP/IP connectivity.
+- **OpenPLC Runtime:** An operational OpenPLC server with Websocket connectivity.
 
 ### Configuration
 

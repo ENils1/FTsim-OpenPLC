@@ -37,7 +37,6 @@ import time
 import threading
 import psm
 
-HOST = "0.0.0.0"
 PORT = 5000
 UPDATE_INTERVAL = 0.1
 NUMBER_OF_OUTPUTS = 10
@@ -83,7 +82,7 @@ def main():
     psm.start()
     init_psm()
 
-    server = WebsocketServer(host=HOST, port=PORT)
+    server = WebsocketServer(port=PORT)
     server.set_fn_new_client(new_client)
     server.set_fn_client_left(client_left)
     server.set_fn_message_received(message_received)

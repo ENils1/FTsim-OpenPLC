@@ -35,132 +35,65 @@ from websocket_server import WebsocketServer
 import json
 import time
 import threading
-import logging
-import socket
 import psm
 
-UPDATE_INTERVAL = 0.1
-NUMBER_OF_OUTPUTS = 10
 HOST = "0.0.0.0"
 PORT = 5000
+UPDATE_INTERVAL = 0.1
+NUMBER_OF_OUTPUTS = 10
 
-class WebSocketPLCServer:
-    def __init__(self):
-        self.server = WebsocketServer(host=HOST, port=PORT)
-        self.server.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        self.clients = {}  # {client_id: (client, last_heartbeat, active)}
-        self.clients_lock = threading.Lock()
-        self.running = False
+def init_psm():
+    for addr in ["IX1.0", "IX0.6", "IX0.7", "IX1.1", "IX1.2", "IX0.3", "IX0.5"]:
+        psm.set_var(addr, True)
 
-    def start(self):
-        """Start the WebSocket server and PSM"""
+def get_qx_updates():
+    qx = {}
+    for i in range(NUMBER_OF_OUTPUTS):
+        addr = f"QX{i//8}.{i%8}"
         try:
-            psm.start()
-            self.init_psm()
-            self.running = True
+            qx[addr] = psm.get_var(addr)
+        except Exception:
+            qx[addr] = None
+    return qx
 
-            self.server.set_fn_new_client(self.new_client)
-            self.server.set_fn_client_left(self.client_left)
-            self.server.set_fn_message_received(self.message_received)
+def new_client(client, server):
+    print(f"Client connected: {client['id']}")
 
-            threading.Thread(target=self.server.run_forever, daemon=True).start()
-            threading.Thread(target=self.broadcast_updates, daemon=True).start()
+def client_left(client, server):
+    print(f"Client disconnected: {client['id']}")
 
-            print(f"WebSocket server started on {HOST}:{PORT}")
-        except Exception as e:
-            print(f"Server startup error: {e}")
-            self.stop()
+def message_received(client, server, message):
+    try:
+        cmd = json.loads(message)
+        if cmd.get("action") == "set_IX":
+            psm.set_var(cmd.get("address"), cmd.get("value"))
+    except Exception as e:
+        print(f"Error: {e}")
 
-    def init_psm(self):
-        """Initialize PSM variables"""
+def broadcast_loop(server):
+    while True:
         try:
-            psm.set_var("IX1.0", True)
-            psm.set_var("IX0.6", True)
-            psm.set_var("IX0.7", True)
-            psm.set_var("IX1.1", True)
-            psm.set_var("IX1.2", True)
-            psm.set_var("IX0.3", True)
-            psm.set_var("IX0.5", True)
-            print("PSM initialized")
+            data = json.dumps(get_qx_updates())
+            server.send_message_to_all(data)
         except Exception as e:
-            print(f"PSM initialization error: {e}")
-
-    def new_client(self, client, server):
-        """Handle new client connection"""
-        with self.clients_lock:
-            # Record the time of connection.
-            self.clients[client['id']] = (client, time.time(), True)
-        print(f"New client connected: {client['id']}")
-
-    def client_left(self, client, server):
-        """Handle client disconnection"""
-        with self.clients_lock:
-            if client['id'] in self.clients:
-                del self.clients[client['id']]
-        print(f"Client disconnected: {client['id']}")
-
-    def message_received(self, client, server, message):
-        """Process incoming messages from client"""
-        try:
-            command = json.loads(message)
-            #print(f"Received command: {command}")
-            if command.get("action") == "set_IX":
-                psm.set_var(command.get("address"), command.get("value"))
-        except json.JSONDecodeError as e:
-            print(f"Invalid JSON: {e} - Data: {message}")
-        except Exception as e:
-            print(f"Processing error: {e}")
-
-    def broadcast_updates(self):
-        """Broadcast QX updates to all clients"""
-        while self.running:
-            try:
-                qx_updates = self.get_qx_updates()
-                json_update = json.dumps(qx_updates)
-                data_size = len(json_update.encode('utf-8'))
-                with self.clients_lock:
-                    for client_id in list(self.clients.keys()):
-                        client, _, active = self.clients[client_id]
-                        if active:
-                            self.server.send_message(client, json_update)
-            except Exception as e:
-                print(f"Broadcast error: {e}")
-                time.sleep(1)
-            time.sleep(UPDATE_INTERVAL)
-
-    def get_qx_updates(self):
-        """Generate QX updates from PSM values"""
-        qx_updates = {}
-        for index in range(NUMBER_OF_OUTPUTS):
-            msb = index // 8
-            lsb = index % 8
-            address = f"QX{msb}.{lsb}"
-            try:
-                qx_updates[address] = psm.get_var(address)
-            except Exception as e:
-                print(f"Error getting variable {address}: {e}")
-        return qx_updates
-    
-    def stop(self):
-        """Stop the server"""
-        self.running = False
-        self.server.shutdown()
-        try:
-            psm.stop()
-        except Exception as e:
-            print(f"Error stopping PSM: {e}")
-        print("Server stopped")
+            print(f"Broadcast error: {e}")
+        time.sleep(UPDATE_INTERVAL)
 
 def main():
-    server = WebSocketPLCServer()
-    server.start()
-    while (not psm.should_quit()):
-        time.sleep(0.1)
-    server.stop()
+    psm.start()
+    init_psm()
+
+    server = WebsocketServer(host=HOST, port=PORT)
+    server.set_fn_new_client(new_client)
+    server.set_fn_client_left(client_left)
+    server.set_fn_message_received(message_received)
+
+    threading.Thread(target=broadcast_loop, args=(server,), daemon=True).start()
+    print(f"Server running on {HOST}:{PORT}")
+    server.run_forever()
 
 if __name__ == "__main__":
     main()
-
 ```
 
 ## Credits

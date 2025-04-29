@@ -88,7 +88,7 @@ def main():
     server.set_fn_message_received(message_received)
 
     threading.Thread(target=broadcast_loop, args=(server,), daemon=True).start()
-    print(f"Server running on {HOST}:{PORT}")
+    print(f"Server running on 0.0.0.0:{PORT}")
     server.run_forever()
 
 if __name__ == "__main__":
